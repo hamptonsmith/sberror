@@ -292,4 +292,52 @@ const SBError = require('./index');
     assert.equal(switchResult, 6, 'Switch returns default result.');
 }
 
+{
+	let receivedTemplate;
+	let receivedDetails;
+
+	const SubError = SBError.subtype('SubError', {
+		template: '{{foo}}',
+		templater: (template, details) => {
+			receivedTemplate = template;
+			receivedDetails = details;
+			
+			return 'bar';
+		}
+	});
+	
+	const subErrorInstance = new SubError({foo: 5});
+	
+	assert.equal(subErrorInstance.message, 'bar',
+			'Message reflects custom renderer');
+	assert.equal(receivedTemplate, '{{foo}}',
+			'Custom renderer received template.');
+	assert.deepEqual(receivedDetails, {foo: 5},
+			'Custom renderer received details.');
+}
+
+{
+	const AError = SBError.subtype(
+			'AError', { template: '{{foo}}', templater: () => 'bar' });
+	const BError = AError.subtype('BError', '{{bazz}}');
+	
+	const b = new BError({ foo: 'x', bazz: 'y' });
+	
+	assert.equal(b.message, 'bar', 'Subtype inherits templater.');
+}
+
+{
+	const AbstractError =
+			SBError.subtype('AbstractError', { templater: () => 'foo' });
+
+	try {
+		new AbstractError();
+	}
+    catch (e) {
+        assert(e instanceof SBError.CannotInstantiateAbstract,
+        		'custom templater still does\'t allow instantiation of ' +
+        		'abstract error');
+    }
+}
+
 console.log('All tests passed.');

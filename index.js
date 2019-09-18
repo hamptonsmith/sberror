@@ -50,6 +50,8 @@ module.exports.UnexpectedType = SBError.subtype(
         'UnexpectedType',
         'Expected {{valueName}} to be type {{expectedTypeDescription}}, but ' +
         'value was {{value}}, of type {{valueType}}.');
+module.exports.BadOptions = SBError.subtype(
+		'BadOptions', 'Provided options were unacceptable.  {{reason}}');
 
 module.exports.switch = (error, cases, defaultFn) => {
     if (error === undefined || error === null) {
@@ -101,8 +103,18 @@ module.exports.switch = (error, cases, defaultFn) => {
     return toCall(error);
 }
 
-function subtyper(ParentClass) {
-    return (name, template) => {
+function subtyper(ParentClass, parentOptions) {
+	parentOptions = parentOptions || {};
+
+    return (name, options) => {
+		options = options || {};
+		if (typeof options === 'string') {
+			options = { template: options };
+		}
+		
+		options.templater = options.templater || parentOptions.templater ||
+				Mustache.render;
+		
         const result = class extends ParentClass {
             constructor(details, cause) {
                 let message;
@@ -115,7 +127,7 @@ function subtyper(ParentClass) {
                 else {
                     // This is a normal public constructor call.
                     
-                    if (!template) {
+                    if (!options.template) {
                         throw buildAbstractError(name);
                     }
                     
@@ -124,7 +136,8 @@ function subtyper(ParentClass) {
                         details = undefined;
                     }
                     
-                    message = Mustache.render(template, details || {});
+                    message =
+                    		options.templater(options.template, details || {});
                 }
                
                 super(topSecret, message);
@@ -163,7 +176,7 @@ function subtyper(ParentClass) {
         };
         
         Object.defineProperty(result, 'name', { value: name });
-        result.subtype = subtyper(result);
+        result.subtype = subtyper(result, options);
         
         return result;
     };
